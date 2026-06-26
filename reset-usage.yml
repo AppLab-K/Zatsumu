@@ -1,0 +1,41 @@
+name: Monthly Usage Reset
+
+# ============================================================
+#  毎月1日の 15:00 UTC（= 日本時間 翌日 AM 0:00）に実行
+#
+#  UTC 15:00 = JST 24:00（翌日 0:00）
+#  日本のビジネスサイクルに合わせ、
+#  月の変わり目の深夜ちょうどにリセットを行う。
+# ============================================================
+
+on:
+  schedule:
+    - cron: '0 15 1 * *'
+
+  # 手動トリガー（テスト・緊急リセット用）
+  workflow_dispatch:
+
+jobs:
+  reset-usage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Trigger Reset API
+        run: |
+          RESPONSE=$(curl -s -o /tmp/response.json -w "%{http_code}" \
+            -X POST "https://zatsumu.pages.dev/api/cron/reset-usage" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET_TOKEN }}" \
+            -H "Content-Type: application/json")
+
+          echo "HTTP Status: $RESPONSE"
+          echo "Response Body:"
+          cat /tmp/response.json
+
+          # 200 以外はエラーとして失敗扱いにする
+          if [ "$RESPONSE" != "200" ]; then
+            echo "❌ Reset API が失敗しました（HTTP $RESPONSE）"
+            exit 1
+          fi
+
+          echo "✅ 月次使用量リセット完了"
